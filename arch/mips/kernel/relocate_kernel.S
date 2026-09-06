@@ -6,6 +6,7 @@
 
 #include <asm/asm.h>
 #include <asm/asmmacro.h>
+#include <asm/cacheops.h>
 #include <asm/regdef.h>
 #include <asm/mipsregs.h>
 #include <asm/stackframe.h>
@@ -90,6 +91,39 @@ done:
 	syncw
 	syncw
 	synci		0($0)
+	.set pop
+#elif defined(CONFIG_CPU_R5900)
+	/*
+	 * The R5900 predates synci, and a plain sync only orders stores: the
+	 * kernel just copied above still sits in the write-back data cache,
+	 * while the instruction cache holds whatever used to live at those
+	 * addresses.  Jumping there executes stale memory.
+	 *
+	 * Write the data cache back and invalidate the instruction cache by
+	 * index.  This cannot call the kernel's own cache routines, because
+	 * the copy may have overwritten the stack this code is standing on,
+	 * so the loop is open coded and touches no memory.
+	 *
+	 * Index base is zero rather than CKSEG0, and the data cache
+	 * operations are bracketed by sync.l, both as required by the R5900
+	 * errata handled in asm/r4kcache.h.  Sweeping 32 KiB in 64 byte lines
+	 * covers the 16 KiB instruction and 8 KiB data caches with room to
+	 * spare; surplus indices simply wrap.
+	 */
+	.set push
+	.set noreorder
+	.set mips3
+	move		t0, zero
+	li		t1, 0x8000
+1:
+	sync.l
+	cache		Index_Writeback_Inv_D, 0(t0)
+	sync.l
+	cache		Index_Invalidate_I, 0(t0)
+	PTR_ADDIU	t0, t0, 64
+	bne		t0, t1, 1b
+	 nop
+	sync
 	.set pop
 #else
 	sync
