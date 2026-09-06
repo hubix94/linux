@@ -73,6 +73,49 @@ static struct platform_device pata_device = {
 	.resource	= pata_resources,
 };
 
+/*
+ * The SMAP part of the SPEED chip in the expansion bay: registers, buffer
+ * descriptors and both FIFO data ports live in the first 16 KiB of the
+ * window.  The hardware only answers once iop-dev9 has powered the bay,
+ * which the driver verifies through the IOP before it touches the window.
+ */
+#define SMAP_BASE	0x14000000
+#define SMAP_SIZE	0x4000
+
+static struct resource smap_resources[] = {
+	[0] = {
+		.name	= "SMAP",
+		.start	= SMAP_BASE,
+		.end	= SMAP_BASE + SMAP_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.name	= "rx",
+		.start	= IRQ_IOP_SPD_RXEND,
+		.end	= IRQ_IOP_SPD_RXEND,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[2] = {
+		.name	= "tx",
+		.start	= IRQ_IOP_SPD_TXEND,
+		.end	= IRQ_IOP_SPD_TXEND,
+		.flags	= IORESOURCE_IRQ,
+	},
+	[3] = {
+		.name	= "emac3",
+		.start	= IRQ_IOP_SPD_EMAC3,
+		.end	= IRQ_IOP_SPD_EMAC3,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device smap_device = {
+	.name		= "ps2-smap",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(smap_resources),
+	.resource	= smap_resources,
+};
+
 static struct resource gs_resources[] = {
 	[0] = {
 		.name	= "Graphics Synthesizer",
@@ -113,6 +156,7 @@ static struct platform_device *ps2_platform_devices[] __initdata = {
 	&iop_device,
 	&ohci_device,
 	&pata_device,
+	&smap_device,
 	&gs_device,
 	&gs_drm_device,	/* FIXME */
 	&rtc_device,
