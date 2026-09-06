@@ -611,6 +611,15 @@ static int iop_reset(void)
 	return iop_reset_arg(IOP_RESET_ARGS);
 }
 
+/*
+ * Restarting the machine means handing control to the boot ROM, which
+ * expects an IOP that has just been reset rather than one running the
+ * modules this kernel loaded.  arch/mips/ps2/reboot.c cannot do that
+ * itself, as the reset goes through the command interface implemented
+ * here, so it is given a way to ask.
+ */
+extern void ps2_set_iop_reset(int (*fn)(void));
+
 static int sif_cmd_init(dma_addr_t cmd_buffer)
 {
 	const struct sif_cmd_change_addr_packet cmd = { .addr = cmd_buffer };
@@ -852,6 +861,8 @@ static int __init sif_init(void)
 		goto err_rpc_init;
 	}
 
+	ps2_set_iop_reset(iop_reset);
+
 	return 0;
 
 err_rpc_init:
@@ -873,6 +884,8 @@ err_dma_buffers:
 
 static void __exit sif_exit(void)
 {
+	ps2_set_iop_reset(NULL);
+
 	sif_disable_dma();
 
 	free_irq(IRQ_DMAC_SIF0, NULL);
